@@ -70,20 +70,20 @@ class Regressor:
         print(f"The preprocessed data was saved to {output_path}.")
         return df
     
-    def separate_features_target(self, df, target, drop_columns=None):
-        if drop_columns is None:
-            drop_columns=[]
-        drop_columns=set(drop_columns + [target])
-        X=df.drop(columns=[col for col in drop_columns if col in df.columns])
+    def separate_features_target(self, df, target, columns_to_remove=None):
+        if columns_to_remove is None:
+            columns_to_remove=[]
+        columns_to_remove=set(columns_to_remove + [target])
+        X=df.drop(columns=[col for col in columns_to_remove if col in df.columns])
         y=df[target]
         return X, y
-
+    
 
     def select_features(self, X, y, threshold=0.1):
         correlations = pd.Series(r_regression(X, y), index=X.columns)
         selected_features = correlations[correlations.abs() >= threshold].index
         print(f"The selected features of {X.shape[1]} were: {len(selected_features)}")
-        return X[selected_features], correlations
+        return selected_features, correlations
 
     def train_models(self, X, y):
         results = {}
