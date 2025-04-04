@@ -98,4 +98,75 @@ def train_model(model, x_train, x_test, y_train, y_test):
         print(f"{model} MSE: {mse:.4f}")
     return results
 
-### function that  
+# Function that performs model tuning and 
+# finds the hyperparameters through grid search and cross validation 
+def model_tuning(models, df_features, df_target, params_grids, cv):
+    best_results={}
+
+    for model, param_grid in param_grids.items():
+        best_rmse=float('inf')
+        best_model=None
+        best_params=None 
+
+        keys=params_grids.keys()
+        values=param_grids.values()
+
+        for combination in model_combinations[model]:
+            model_instance=models[model](**combination)
+            scores=cross_val_score(model_instance, df_features, df_target, scoring='neg_root_mean_squared_error', cv=cv)
+            rmse=(-scores.mean())**0.5
+
+            print(f"[{model}] Tested params: {combination}")
+            print(f"[{model}] RMSE: {rmse:.4f}")
+
+            if rmse < best_rmse:
+                best_rmse = rmse
+                best_model = model_instance
+                best_params = combination
+                print(f"[{model}] New best RMSE: {best_rmse:.4f}")
+                print(f"[{model}] Best params so far: {best_params}")
+
+        best_results[model] = {
+            'Best RMSE': best_rmse,
+            'Best Model': best_model,
+            'Best Params': best_params
+        }
+    return best_results
+
+# Function that summarizes the metrics for the evaluation 
+def summarize(scores):
+    mean = np.mean(scores)
+    std = np.std(scores, ddof=1)
+    ci95 = t.interval(0.95, len(scores) - 1, loc=mean, scale=std / np.sqrt(len(scores)))
+    return {
+        'mean': mean,
+        'median': np.median(scores),
+        '95% CI': ci95
+    }
+
+# Function for evaluation
+def evaluate_model(model, X, y, runs=30, test_size=0.2, save_path="../final_models/final_models.pkl"):
+    metrics={
+        'rmse':[],
+        'mae':[],
+        'r2':[]
+    }
+
+    for i in range(runs):
+        X_train, X_test, y_train, y_test=train_test_split(X, y, test_size=test_size)
+        model.fit(X_train, y_train)
+        y_pred=model.predict(X_test)
+
+        metrics['rmse'].append(root_mean_squared_error(y_test, y_pred))
+        metrics['mae'].append(mean_absolute_error(y_test, y_pred))
+        metrics['r2'].append(r2_score(y_test, y_pred))
+
+        results = {k: summarize(v) for k, v in metrics.items()}
+
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+    joblib.dump(model, save_path)
+    print(f"Model saved to {save_path}")
+
+    return results
+
+
