@@ -69,6 +69,14 @@ class Regressor:
         df.to_csv(output_path, index=False)
         print(f"The preprocessed data was saved to {output_path}.")
         return df
+    
+    def separate_features_target(self, df, target, drop_columns=None):
+        if drop_columns is None:
+            drop_columns=[]
+        drop_columns=set(drop_columns + [target])
+        X=df.drop(columns=[col for col in drop_columns if col in df.columns])
+        y=df[target]
+        return X, y
 
     def select_features(self, X, y, threshold=0.1):
         correlations = pd.Series(r_regression(X, y), index=X.columns)
@@ -99,7 +107,7 @@ class Regressor:
         for model, params in param_grid.items()
         }
 
-    def model_tuning(self, param_grid, df_features, df_target, cv=5):
+    def model_tuning(self, param_grid, X, y, cv=5):
         best_results = {}
         for model, param_grid in param_grid.items():
             best_rmse = float('inf')
@@ -108,7 +116,7 @@ class Regressor:
             for combo in itertools.product(*param_grid.values()):
                 combo_dict = dict(zip(param_grid.keys(), combo))
                 model_instance = self.models[model].__class__(**combo_dict)
-                scores = cross_val_score(model_instance, df_features, df_target,
+                scores = cross_val_score(model_instance, X, y,
                                          scoring='neg_root_mean_squared_error', cv=cv)
                 rmse = (-scores.mean())**0.5
                 print(f"[{model}] Tested params: {combo_dict}")
@@ -143,7 +151,7 @@ class Regressor:
         print("Evaluation dataset was aligned to development feature set.")
         return val_aligned
     
-    def evaluate_model(self, model, X, y, runs=30, test_size=0.2, save_path="../final_models/final_model.pkl"):
+    def evaluate_model(self, model, X, y, runs=30, test_size=0.2, save_path=__path__):
         metrics = {
             'rmse': [],
             'mae': [],
