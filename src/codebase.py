@@ -78,6 +78,7 @@ class Regressor:
         y=df[target]
         return X, y
 
+
     def select_features(self, X, y, threshold=0.1):
         correlations = pd.Series(r_regression(X, y), index=X.columns)
         selected_features = correlations[correlations.abs() >= threshold].index
@@ -98,7 +99,7 @@ class Regressor:
             print(f"{name} RMSE: {rmse:.4f}")
         return results
 
-    def generate_param_combintions(self):
+    def generate_param_combintions(self, param_grid):
         model_combinations = {
         model: [
             dict(zip(params.keys(), values))
@@ -106,6 +107,7 @@ class Regressor:
         ]
         for model, params in param_grid.items()
         }
+        return 
 
     def model_tuning(self, param_grid, X, y, cv=5):
         best_results = {}
