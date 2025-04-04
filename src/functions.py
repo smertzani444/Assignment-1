@@ -5,16 +5,19 @@ import joblib
 import os
 import seaborn as sns
 import matplotlib.pyplot as plt
+import itertools
+from scipy.stats import t
 from sklearn.pipeline import Pipeline 
 from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import StandardScaler
 from sklearn.compose import ColumnTransformer
-from sklearn.preprocessing import OneHotEncoder
+from sklearn.preprocessing import OneHotEncoder, LabelEncoder
+from sklearn.feature_selection import r_regression
 from sklearn.decomposition import PCA
 from sklearn.linear_model import ElasticNet, BayesianRidge
 from sklearn.svm import SVR
-from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
-from sklearn.model_selection import train_test_split
+from sklearn.metrics import mean_squared_error, root_mean_squared_error, mean_absolute_error, r2_score
+from sklearn.model_selection import train_test_split, cross_val_score
 
 # Load the Data 
 # Function that retrieves data from a provided path
@@ -76,10 +79,6 @@ def select_features(X, y, threshold):
     print(f"The selected features of {X.shape[1]} were: {len(selected_features)}")
     return reduced_df, correlations
 
-X=dev_set_cleaned_df.drop(['BMI', 'Host age', 'Sex'], errors='ignore') # Bacteria Species -> features
-y=dev_set_cleaned_df['BMI']
-
-##Modeling functions 
 models={
     'enet':ElasticNet(),
     'svr':SVR(),
@@ -93,9 +92,9 @@ def train_model(model, x_train, x_test, y_train, y_test):
     for model, model_instance in models.items():
         model_instance.fit(x_train, y_train)       
         y_pred=model_instance.predict(x_test)
-        mse=mean_squared_error(y_test, y_pred)
-        results[model]=mse
-        print(f"{model} MSE: {mse:.4f}")
+        rmse=root_mean_squared_error(y_test, y_pred)
+        results[model]=rmse
+        print(f"{model} RMSE: {rmse:.4f}")
     return results
 
 # Function that performs model tuning and 
@@ -143,6 +142,14 @@ def summarize(scores):
         'median': np.median(scores),
         '95% CI': ci95
     }
+
+# Function that aligns evaluation set's columns to the development set
+def align_evaluation_set(dev_df, val_df):
+    dev_columns=dev_df.columns
+    val_aligned=val_df.copy()
+    val_aligned=val_aligned.reindex(columns=dev_columns, fill_value=0)
+    print("Evaluation dataset was aligned to development feature set.")
+    return val_aligned
 
 # Function for evaluation
 def evaluate_model(model, X, y, runs=30, test_size=0.2, save_path="../final_models/final_models.pkl"):
