@@ -81,7 +81,7 @@ class Regressor:
 
         x_train, x_test, y_train, y_test = train_test_split(
         X, y, test_size=0.3, random_state=42)
-
+        
         for name, model in self.models.items():
             model.fit(x_train, y_train)
             y_pred = model.predict(x_test)

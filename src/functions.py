@@ -102,13 +102,13 @@ def train_model(model, x_train, x_test, y_train, y_test):
 def model_tuning(models, df_features, df_target, params_grids, cv):
     best_results={}
 
-    for model, param_grid in param_grids.items():
+    for model, param_grid in param_grid.items():
         best_rmse=float('inf')
         best_model=None
         best_params=None 
 
         keys=params_grids.keys()
-        values=param_grids.values()
+        values=param_grid.values()
 
         for combination in model_combinations[model]:
             model_instance=models[model](**combination)
