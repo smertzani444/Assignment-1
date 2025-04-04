@@ -98,7 +98,7 @@ class Regressor:
             print(f"{name} RMSE: {rmse:.4f}")
         return results
 
-    def generate_param_combintions(param_grid):
+    def generate_param_combintions(self):
         model_combinations = {
         model: [
             dict(zip(params.keys(), values))
@@ -151,7 +151,7 @@ class Regressor:
         print("Evaluation dataset was aligned to development feature set.")
         return val_aligned
     
-    def evaluate_model(self, model, X, y, runs=30, test_size=0.2, save_path=__path__):
+    def evaluate_model(self, model, X, y, runs=30, test_size=0.2, save_path="./final_model.pkl"):
         metrics = {
             'rmse': [],
             'mae': [],
