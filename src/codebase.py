@@ -7,6 +7,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from scipy.stats import t
 import pprint
+import copy
 from sklearn.pipeline import Pipeline 
 from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import StandardScaler, OneHotEncoder, LabelEncoder
@@ -25,11 +26,7 @@ class Regressor:
             'svr': SVR(),
             'breg': BayesianRidge()
         }
-        self.model_names = {
-            'ElasticNet': ElasticNet(),
-            'SVR': SVR(),
-            'BayesianRidge': BayesianRidge()
-        }
+
         self.param_grid = {
             'enet': {
                 'alpha': [0.01, 0.1, 1.0],
@@ -186,28 +183,24 @@ class Regressor:
             metrics['mae'].append(mae)
             metrics['r2'].append(r2)
 
+        # Track the best model
             if rmse < best_rmse:
                 best_rmse = rmse
-                best_model = joblib.loads(joblib.dumps(model))  # Deep copy of best model
+                best_model = copy.deepcopy(model)
 
-        summary = {k: self.summarize(v) for k, v in metrics.items()}
+        results = {k: self.summarize(v) for k, v in metrics.items()}
 
-        if save_path is not None:
-            save_dir = os.path.dirname(save_path)
-            if save_dir:  # Only create directory if one is specified
-                os.makedirs(save_dir, exist_ok=True)
+        if save_path is not None and best_model is not None:
+            os.makedirs(os.path.dirname(save_path), exist_ok=True)
             joblib.dump(best_model, save_path)
-            print(f"Best model saved to {save_path}")
+            print(f"Best model (lowest RMSE: {best_rmse:.4f}) saved to {save_path}")
 
-  
         for metric, values in metrics.items():
             plt.figure(figsize=(8, 6))
             sns.boxplot(y=values)
             plt.title(f"{metric.upper()} Distribution")
             plt.ylabel(metric.upper())
             plt.show()
+        
 
-        return summary, metrics
-
-
-    
+        return results
