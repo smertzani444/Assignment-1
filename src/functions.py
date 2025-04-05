@@ -1,179 +1,206 @@
-# Imports 
 import pandas as pd
 import numpy as np
 import joblib
 import os
+import itertools
 import seaborn as sns
 import matplotlib.pyplot as plt
-import itertools
 from scipy.stats import t
+import pprint
+import copy
 from sklearn.pipeline import Pipeline 
 from sklearn.impute import SimpleImputer
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler, OneHotEncoder, LabelEncoder
 from sklearn.compose import ColumnTransformer
-from sklearn.preprocessing import OneHotEncoder, LabelEncoder
 from sklearn.feature_selection import r_regression
 from sklearn.decomposition import PCA
 from sklearn.linear_model import ElasticNet, BayesianRidge
 from sklearn.svm import SVR
-from sklearn.metrics import mean_squared_error, root_mean_squared_error, mean_absolute_error, r2_score
+from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score, root_mean_squared_error
 from sklearn.model_selection import train_test_split, cross_val_score
 
-# Load the Data 
-# Function that retrieves data from a provided path
-# and reads the data as a pandas dataframe
-def load_data(path):
-    if not os.path.isfile(path):
-        raise FileNotFoundError(f"The file at {path} was not found.")
-    if 'dev' in path:
-        print('Data for development:')
-    elif 'val' in path:
-        print('Data for evaluation:')
-    else:
-        raise ValueError("The path provided does not contain data for development nor for evaluation.")
-    data = pd.read_csv(path)
-    return data
+class Regressor:
+    def __init__(self):
+        self.models = {
+            'enet': ElasticNet(),
+            'svr': SVR(),
+            'breg': BayesianRidge()
+        }
 
+        self.param_grid = {
+            'enet': {
+                'alpha': [0.01, 0.1, 1.0],
+                'l1_ratio': [0.2, 0.5, 0.8]
+            },
+            'svr': {
+                'C': [0.1, 1, 10],
+                'epsilon': [0.01, 0.1],
+                'kernel': ['rbf', 'linear']
+            },
+            'breg': {
+                'alpha_1': [1e-6, 1e-5],
+                'lambda_1': [1e-6, 1e-5]
+            }
+        }
 
-# Pipeline for preprocessing
-# Function that:
-# Drops specific columns,
-# handles missing values, 
-# encodes categorical features and
-# saves preprocessed data in a csv file in the output path that we provide
-def preprocess_data(df, output_path, columns_to_drop, scale=True):
-    df = df.drop(columns=[col for col in columns_to_drop if col in df.columns])
+    def load_data(self, path):
+        if not os.path.isfile(path):
+            raise FileNotFoundError(f"The file at {path} was not found.")
+        if 'dev' in path:
+            print('Data for development:')
+        elif 'val' in path:
+            print('Data for evaluation:')
+        else:
+            raise ValueError("The path provided does not contain data for development nor for evaluation.")
+        return pd.read_csv(path)
 
-    num_list = df.select_dtypes(include=[np.number]).columns.tolist()
-    cat_list = df.select_dtypes(exclude=[np.number]).columns.tolist()
+    def preprocess_data(self, df, output_path, columns_to_drop=[], scale=True):
+        df = df.drop(columns=[col for col in columns_to_drop if col in df.columns])
+        num_list = df.select_dtypes(include=[np.number]).columns.tolist()
+        cat_list = df.select_dtypes(exclude=[np.number]).columns.tolist()
+
+        for col in cat_list:
+            df[col] = LabelEncoder().fit_transform(df[col])
+
+        if scale:
+            num_pipeline = Pipeline([
+                ('imputer', SimpleImputer(strategy='mean')),
+                ('scaler', StandardScaler())
+            ])
+        else:
+            num_pipeline = Pipeline([('imputer', SimpleImputer(strategy='mean'))])
+
+        df[num_list] = num_pipeline.fit_transform(df[num_list])
+        df.to_csv(output_path, index=False)
+        print(f"The preprocessed data was saved to {output_path}.")
+        return df
     
-    for column in num_list + cat_list:
-        if column not in df.columns:
-            raise ValueError(f"'{column}' could not be found in the dataframe provided.") 
+    def separate_features_target(self, df, target, columns_to_remove=None):
+        if columns_to_remove is None:
+            columns_to_remove=[]
+        columns_to_remove=set(columns_to_remove + [target])
+        X=df.drop(columns=[col for col in columns_to_remove if col in df.columns])
+        y=df[target]
+        return X, y
     
-    for col in cat_list:
-        df[col] = LabelEncoder().fit_transform(df[col])
 
-    if scale:
-        num_pipeline=Pipeline([
-        ('imputer', SimpleImputer(strategy='mean')),
-        ('scaler', StandardScaler())
-    ])
-    else:
-        num_pipeline=Pipeline([('imputer', SimpleImputer(strategy='mean'))])
+    def select_features(self, X, y, threshold=0.1):
+        correlations = pd.Series(r_regression(X, y), index=X.columns)
+        selected_features = correlations[correlations.abs() >= threshold].index.tolist()
+        print(f"The selected features of {X.shape[1]} were: {len(selected_features)}")
+        return selected_features, correlations
 
+    def train_models(self, X, y):
+        results = {}
 
-    df[num_list] = num_pipeline.fit_transform(df[num_list])
+        x_train, x_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.3, random_state=42)
+        
+        for name, model in self.models.items():
+            model.fit(x_train, y_train)
+            y_pred = model.predict(x_test)
+            rmse = root_mean_squared_error(y_test, y_pred)
+            results[name] = rmse
+            print(f"{name} RMSE: {rmse:.4f}")
+        return results
 
-    df.to_csv(output_path, index=False)
+    def generate_param_combintions(self, param_grid):
+        model_combinations = {
+        model: [
+            dict(zip(params.keys(), values))
+            for values in itertools.product(*params.values())
+        ]
+        for model, params in param_grid.items()
+        }
+        return model_combinations
 
-    print(f"The preprocessed data was saved to {output_path}.")
-    return df
+    def model_tuning(self, param_grid, X, y, cv=5):
+        best_results = {}
+        for model, param_grid in param_grid.items():
+            best_rmse = float('inf')
+            best_model = None
+            best_params = None
+            for combo in itertools.product(*param_grid.values()):
+                combo_dict = dict(zip(param_grid.keys(), combo))
+                model_instance = self.models[model].__class__(**combo_dict)
+                scores = cross_val_score(model_instance, X, y,
+                                         scoring='neg_root_mean_squared_error', cv=cv)
+                rmse = (-scores.mean())**0.5
+                print(f"[{model}] Tested params: {combo_dict}")
+                print(f"[{model}] RMSE: {rmse:.4f}")
+                if rmse < best_rmse:
+                    best_rmse = rmse
+                    best_model = model_instance
+                    best_params = combo_dict
+                    print(f"[{model}] New best RMSE: {best_rmse:.4f}")
+                    print(f"[{model}] Best params so far: {best_params}")
+            best_results[model] = {
+                'Best RMSE': best_rmse,
+                'Best Model': best_model,
+                'Best Params': best_params
+            }
+        return best_results
 
-# Function that selects features based on the Pearson's Correlation Coefficient Method
-def select_features(X, y, threshold):
-    correlations=pd.Series(r_regression(X, y), index=X.columns)
-    selected_features=correlations[correlations.abs() >= threshold].index
-    reduced_df=X[selected_features]
+    def summarize(self, scores):
+        mean = np.mean(scores)
+        std = np.std(scores, ddof=1)
+        ci95 = t.interval(0.95, len(scores) - 1, loc=mean, scale=std / np.sqrt(len(scores)))
+        return {
+            'mean': mean,
+            'median': np.median(scores),
+            '95% CI': ci95
+        }
+
     
-    print(f"The selected features of {X.shape[1]} were: {len(selected_features)}")
-    return reduced_df, correlations
+    def align_evaluation_set(self, dev_df, val_df):
+        dev_columns = dev_df.columns
+        val_aligned = val_df.copy()
+        val_aligned = val_aligned.reindex(columns=dev_columns, fill_value=0)
+        print("Evaluation dataset was aligned to development feature set.")
+        return val_aligned
+    
 
-models={
-    'enet':ElasticNet(),
-    'svr':SVR(),
-    'breg':BayesianRidge()
-}
+    def evaluate_model(self, model, X, y, runs=30, test_size=0.2, save_path=None):
+        metrics = {
+            'rmse': [],
+            'mae': [],
+            'r2': []
+        }
 
-# Function to train the models
-def train_model(model, x_train, x_test, y_train, y_test):
-    results={}
+        best_rmse = float('inf')
+        best_model = None
 
-    for model, model_instance in models.items():
-        model_instance.fit(x_train, y_train)       
-        y_pred=model_instance.predict(x_test)
-        rmse=root_mean_squared_error(y_test, y_pred)
-        results[model]=rmse
-        print(f"{model} RMSE: {rmse:.4f}")
-    return results
+        for i in range(runs):
+            X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size)
+            model.fit(X_train, y_train)
+            y_pred = model.predict(X_test)
 
-# Function that performs model tuning and 
-# finds the hyperparameters through grid search and cross validation 
-def model_tuning(models, df_features, df_target, params_grids, cv):
-    best_results={}
+            rmse = root_mean_squared_error(y_test, y_pred)
+            mae = mean_absolute_error(y_test, y_pred)
+            r2 = r2_score(y_test, y_pred)
 
-    for model, param_grid in param_grid.items():
-        best_rmse=float('inf')
-        best_model=None
-        best_params=None 
+            metrics['rmse'].append(rmse)
+            metrics['mae'].append(mae)
+            metrics['r2'].append(r2)
 
-        keys=params_grids.keys()
-        values=param_grid.values()
-
-        for combination in model_combinations[model]:
-            model_instance=models[model](**combination)
-            scores=cross_val_score(model_instance, df_features, df_target, scoring='neg_root_mean_squared_error', cv=cv)
-            rmse=(-scores.mean())**0.5
-
-            print(f"[{model}] Tested params: {combination}")
-            print(f"[{model}] RMSE: {rmse:.4f}")
-
+        # Track the best model
             if rmse < best_rmse:
                 best_rmse = rmse
-                best_model = model_instance
-                best_params = combination
-                print(f"[{model}] New best RMSE: {best_rmse:.4f}")
-                print(f"[{model}] Best params so far: {best_params}")
+                best_model = copy.deepcopy(model)
 
-        best_results[model] = {
-            'Best RMSE': best_rmse,
-            'Best Model': best_model,
-            'Best Params': best_params
-        }
-    return best_results
+        results = {k: self.summarize(v) for k, v in metrics.items()}
 
-# Function that summarizes the metrics for the evaluation 
-def summarize(scores):
-    mean = np.mean(scores)
-    std = np.std(scores, ddof=1)
-    ci95 = t.interval(0.95, len(scores) - 1, loc=mean, scale=std / np.sqrt(len(scores)))
-    return {
-        'mean': mean,
-        'median': np.median(scores),
-        '95% CI': ci95
-    }
+        if save_path is not None and best_model is not None:
+            os.makedirs(os.path.dirname(save_path), exist_ok=True)
+            joblib.dump(best_model, save_path)
+            print(f"Best model (lowest RMSE: {best_rmse:.4f}) saved to {save_path}")
 
-# Function that aligns evaluation set's columns to the development set
-def align_evaluation_set(dev_df, val_df):
-    dev_columns=dev_df.columns
-    val_aligned=val_df.copy()
-    val_aligned=val_aligned.reindex(columns=dev_columns, fill_value=0)
-    print("Evaluation dataset was aligned to development feature set.")
-    return val_aligned
+        for metric, values in metrics.items():
+            plt.figure(figsize=(8, 6))
+            sns.boxplot(y=values)
+            plt.title(f"{metric.upper()} Distribution")
+            plt.ylabel(metric.upper())
+            plt.show()
+        
 
-# Function for evaluation
-def evaluate_model(model, X, y, runs=30, test_size=0.2, save_path="../final_models/final_models.pkl"):
-    metrics={
-        'rmse':[],
-        'mae':[],
-        'r2':[]
-    }
-
-    for i in range(runs):
-        X_train, X_test, y_train, y_test=train_test_split(X, y, test_size=test_size)
-        model.fit(X_train, y_train)
-        y_pred=model.predict(X_test)
-
-        metrics['rmse'].append(root_mean_squared_error(y_test, y_pred))
-        metrics['mae'].append(mean_absolute_error(y_test, y_pred))
-        metrics['r2'].append(r2_score(y_test, y_pred))
-
-        results = {k: summarize(v) for k, v in metrics.items()}
-
-    os.makedirs(os.path.dirname(save_path), exist_ok=True)
-    joblib.dump(model, save_path)
-    print(f"Model saved to {save_path}")
-
-    return results
-
-
+        return results
