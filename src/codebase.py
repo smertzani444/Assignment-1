@@ -25,6 +25,11 @@ class Regressor:
             'svr': SVR(),
             'breg': BayesianRidge()
         }
+        self.model_names = {
+            'ElasticNet': ElasticNet(),
+            'SVR': SVR(),
+            'BayesianRidge': BayesianRidge()
+        }
         self.param_grid = {
             'enet': {
                 'alpha': [0.01, 0.1, 1.0],
@@ -158,8 +163,7 @@ class Regressor:
         return val_aligned
     
 
-    def evaluate_model(self, model, X, y, runs=30, test_size=0.2, save_path=None,
-                   model_name="Model", stage="Baseline", show_plots=True, save_plot_path=None):
+    def evaluate_model(self, model, X, y, runs=30, test_size=0.2, save_path=None):
         metrics = {
             'rmse': [],
             'mae': [],
@@ -182,28 +186,28 @@ class Regressor:
             metrics['mae'].append(mae)
             metrics['r2'].append(r2)
 
-        if rmse < best_rmse:
-            best_rmse = rmse
-            best_model = joblib.loads(joblib.dumps(model))  # Deep copy of best model
+            if rmse < best_rmse:
+                best_rmse = rmse
+                best_model = joblib.loads(joblib.dumps(model))  # Deep copy of best model
 
         summary = {k: self.summarize(v) for k, v in metrics.items()}
 
-        if save_path and best_model:
-            os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        if save_path is not None:
+            save_dir = os.path.dirname(save_path)
+            if save_dir:  # Only create directory if one is specified
+                os.makedirs(save_dir, exist_ok=True)
             joblib.dump(best_model, save_path)
             print(f"Best model saved to {save_path}")
 
-        if show_plots:
-            for metric, values in metrics.items():
-                plt.figure(figsize=(8, 6))
-                sns.boxplot(y=values)
-                plt.title(f"{metric.upper()} - {model} ({stage})")
-                plt.ylabel(metric.upper())
-                if save_plot_path:
-                    os.makedirs(save_plot_path, exist_ok=True)
-                    plt.savefig(os.path.join(save_plot_path, f"{model}_{stage}_{metric}.png"))
-                plt.show()
+  
+        for metric, values in metrics.items():
+            plt.figure(figsize=(8, 6))
+            sns.boxplot(y=values)
+            plt.title(f"{metric.upper()} Distribution")
+            plt.ylabel(metric.upper())
+            plt.show()
 
         return summary, metrics
+
 
     
