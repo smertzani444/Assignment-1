@@ -3,7 +3,10 @@ import numpy as np
 import joblib
 import os
 import itertools
+import seaborn as sns
+import matplotlib.pyplot as plt
 from scipy.stats import t
+import pprint
 from sklearn.pipeline import Pipeline 
 from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import StandardScaler, OneHotEncoder, LabelEncoder
@@ -83,7 +86,7 @@ class Regressor:
         correlations = pd.Series(r_regression(X, y), index=X.columns)
         selected_features = correlations[correlations.abs() >= threshold].index.tolist()
         print(f"The selected features of {X.shape[1]} were: {len(selected_features)}")
-        return X[selected_features], correlations
+        return selected_features, correlations
 
     def train_models(self, X, y):
         results = {}
@@ -107,7 +110,7 @@ class Regressor:
         ]
         for model, params in param_grid.items()
         }
-        return 
+        return model_combinations
 
     def model_tuning(self, param_grid, X, y, cv=5):
         best_results = {}
@@ -146,6 +149,7 @@ class Regressor:
             '95% CI': ci95
         }
 
+    
     def align_evaluation_set(self, dev_df, val_df):
         dev_columns = dev_df.columns
         val_aligned = val_df.copy()
@@ -153,23 +157,53 @@ class Regressor:
         print("Evaluation dataset was aligned to development feature set.")
         return val_aligned
     
-    def evaluate_model(self, model, X, y, runs=30, test_size=0.2, save_path="./final_model.pkl"):
+
+    def evaluate_model(self, model, X, y, runs=30, test_size=0.2, save_path=None,
+                   model_name="Model", stage="Baseline", show_plots=True, save_plot_path=None):
         metrics = {
             'rmse': [],
             'mae': [],
             'r2': []
         }
 
+        best_rmse = float('inf')
+        best_model = None
+
         for i in range(runs):
             X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size)
             model.fit(X_train, y_train)
             y_pred = model.predict(X_test)
-            metrics['rmse'].append(root_mean_squared_error(y_test, y_pred))
-            metrics['mae'].append(mean_absolute_error(y_test, y_pred))
-            metrics['r2'].append(r2_score(y_test, y_pred))
 
-        results = {k: self.summarize(v) for k, v in metrics.items()}
-        os.makedirs(os.path.dirname(save_path), exist_ok=True)
-        joblib.dump(model, save_path)
-        print(f"Model saved to {save_path}")
-        return results
+            rmse = root_mean_squared_error(y_test, y_pred)
+            mae = mean_absolute_error(y_test, y_pred)
+            r2 = r2_score(y_test, y_pred)
+
+            metrics['rmse'].append(rmse)
+            metrics['mae'].append(mae)
+            metrics['r2'].append(r2)
+
+        if rmse < best_rmse:
+            best_rmse = rmse
+            best_model = joblib.loads(joblib.dumps(model))  # Deep copy of best model
+
+        summary = {k: self.summarize(v) for k, v in metrics.items()}
+
+        if save_path and best_model:
+            os.makedirs(os.path.dirname(save_path), exist_ok=True)
+            joblib.dump(best_model, save_path)
+            print(f"Best model saved to {save_path}")
+
+        if show_plots:
+            for metric, values in metrics.items():
+                plt.figure(figsize=(8, 6))
+                sns.boxplot(y=values)
+                plt.title(f"{metric.upper()} - {model} ({stage})")
+                plt.ylabel(metric.upper())
+                if save_plot_path:
+                    os.makedirs(save_plot_path, exist_ok=True)
+                    plt.savefig(os.path.join(save_plot_path, f"{model}_{stage}_{metric}.png"))
+                plt.show()
+
+        return summary, metrics
+
+    
