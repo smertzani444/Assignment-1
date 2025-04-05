@@ -81,9 +81,9 @@ class Regressor:
 
     def select_features(self, X, y, threshold=0.1):
         correlations = pd.Series(r_regression(X, y), index=X.columns)
-        selected_features = correlations[correlations.abs() >= threshold].index
+        selected_features = correlations[correlations.abs() >= threshold].index.tolist()
         print(f"The selected features of {X.shape[1]} were: {len(selected_features)}")
-        return selected_features, correlations
+        return X[selected_features], correlations
 
     def train_models(self, X, y):
         results = {}
