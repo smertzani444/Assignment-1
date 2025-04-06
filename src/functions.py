@@ -191,13 +191,13 @@ class Regressor:
         best_model = None
 
         for i in range(runs):
-            X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size)
+            x_train, x_test, y_train, y_test = train_test_split(X, y, test_size=test_size)
             if scale:
                 scaler=StandardScaler()
                 x_train=scaler.fit_transform(x_train)
                 x_test=scaler.fit_transform(x_test)
-            model.fit(X_train, y_train)
-            y_pred = model.predict(X_test)
+            model.fit(x_train, y_train)
+            y_pred = model.predict(x_test)
 
             rmse = root_mean_squared_error(y_test, y_pred)
             mae = mean_absolute_error(y_test, y_pred)
