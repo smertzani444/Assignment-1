@@ -114,12 +114,16 @@ class Regressor:
         X, y, test_size=0.3, random_state=42)
 
         if scale:
-            scaler=StandardScaler()
-            x_train=scaler.fit_transform(x_train)
-            x_test=scaler.fit_transform(x_test)
+                scaler=StandardScaler()
+                x_train=scaler.fit_transform(x_train)
+                model.fit(x_train, y_train)
+                x_test=scaler.fit_transform(x_test)
+                y_pred = model.predict(x_test)
+             
+        else:
+            model.fit(x_train, y_train)
+            y_pred = model.predict(x_test)
 
-        model.fit(x_train, y_train)
-        y_pred = model.predict(x_test)
         rmse = root_mean_squared_error(y_test, y_pred)
         print(f"Model: {model.__class__.__name__} RMSE: {rmse:.4f}")
         return rmse
@@ -191,13 +195,17 @@ class Regressor:
         best_model = None
 
         for i in range(runs):
-            x_train, x_test, y_train, y_test = train_test_split(X, y, test_size=test_size)
+            X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size)
             if scale:
                 scaler=StandardScaler()
-                x_train=scaler.fit_transform(x_train)
-                x_test=scaler.fit_transform(x_test)
-            model.fit(x_train, y_train)
-            y_pred = model.predict(x_test)
+                X_train=scaler.fit_transform(X_train)
+                model.fit(X_train, y_train)
+                X_test=scaler.fit_transform(X_test)
+                y_pred = model.predict(X_test)
+             
+            else:
+                model.fit(X_train, y_train)
+                y_pred = model.predict(X_test)
 
             rmse = root_mean_squared_error(y_test, y_pred)
             mae = mean_absolute_error(y_test, y_pred)
