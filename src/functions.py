@@ -90,12 +90,17 @@ class Regressor:
         print(f"The selected features of {X.shape[1]} were: {len(selected_features)}")
         return selected_features, correlations
 
-    def train_models(self, X, y):
+    def train_models(self, X, y, scale=True):
         results = {}
 
         x_train, x_test, y_train, y_test = train_test_split(
         X, y, test_size=0.3, random_state=42)
-        
+
+        if scale:
+            scaler=StandardScaler()
+            x_train=scaler.fit_transform(x_train)
+            x_test=scaler.fit_transform(x_test)
+                    
         for name, model in self.models.items():
             model.fit(x_train, y_train)
             y_pred = model.predict(x_test)
@@ -103,6 +108,21 @@ class Regressor:
             results[name] = rmse
             print(f"{name} RMSE: {rmse:.4f}")
         return results
+
+    def train_tuned_model(self, model, X, y, scale=True):
+        x_train, x_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.3, random_state=42)
+
+        if scale:
+            scaler=StandardScaler()
+            x_train=scaler.fit_transform(x_train)
+            x_test=scaler.fit_transform(x_test)
+
+        model.fit(x_train, y_train)
+        y_pred = model.predict(x_test)
+        rmse = root_mean_squared_error(y_test, y_pred)
+        print(f"Model: {model.__class__.__name__} RMSE: {rmse:.4f}")
+        return rmse
 
     def generate_param_combintions(self, param_grid):
         model_combinations = {
@@ -160,7 +180,7 @@ class Regressor:
         return val_aligned
     
 
-    def evaluate_model(self, model, X, y, runs=30, test_size=0.2, save_path=None):
+    def evaluate_model(self, model, X, y, runs=30, test_size=0.2, scale=True, save_path=None):
         metrics = {
             'rmse': [],
             'mae': [],
@@ -172,6 +192,10 @@ class Regressor:
 
         for i in range(runs):
             X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size)
+            if scale:
+                scaler=StandardScaler()
+                x_train=scaler.fit_transform(x_train)
+                x_test=scaler.fit_transform(x_test)
             model.fit(X_train, y_train)
             y_pred = model.predict(X_test)
 
