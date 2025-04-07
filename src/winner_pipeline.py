@@ -80,8 +80,7 @@ class BMI_predictor:
     
     # function that separates features and target,
     # 
-    def train_model(self, df, target='BMI', columns_to_drop=None, scale=True):
-        self.selected_features = selected_features
+    def train_model(self, df, target='BMI', columns_to_drop=None, scale=True, selected_features=[]):
         if columns_to_drop is None:                                                                # creates empty list for columns to drop if not provided with one
             columns_to_drop=[]
     
@@ -92,8 +91,8 @@ class BMI_predictor:
                                                                                                    # creates df that contains only the selected features 
                                                                                                    # and the target
 
-        X = df.drop(columns=[target])                                                              # X=> only the features (29 columns)
-        y = df[target]                                                                             # y=> only the target   (1 column)
+        X = selected_df.drop(columns=[target])                                                              # X=> only the features (29 columns)
+        y = selected_df[target]                                                                             # y=> only the target   (1 column)
 
         X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.3, random_state=42)                                                      # splits X and y into training and test sets 
