@@ -44,6 +44,7 @@ class Regressor:
             }
         }
 
+    # Function that takes as input the path where he file containing the data is located and loads the data into pandas dataframes
     def load_data(self, path):
         if not os.path.isfile(path):
             raise FileNotFoundError(f"The file at {path} was not found.")
@@ -55,6 +56,10 @@ class Regressor:
             raise ValueError("The path provided does not contain data for development nor for evaluation.")
         return pd.read_csv(path)
 
+    # function that handles missing values and encodes categorical values
+    # it searches for columns containing numerical and categorical values and creates 2 lists respectively
+    # it creates a pipeline for this subtasks 
+    # for this study the scale is set to false, since scaling will be applied later in order to avoid leaking the data to the models
     def preprocess_data(self, df, output_path, columns_to_drop=[], scale=True):
         df = df.drop(columns=[col for col in columns_to_drop if col in df.columns])
         num_list = df.select_dtypes(include=[np.number]).columns.tolist()
