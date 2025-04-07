@@ -191,7 +191,7 @@ class Regressor:
             '95% CI': ci95
         }
 
-    
+    # This function aligns the evaluation's sets columns to the corresponding development df's
     def align_evaluation_set(self, dev_df, val_df):
         dev_columns = dev_df.columns
         val_aligned = val_df.copy()
@@ -199,7 +199,7 @@ class Regressor:
         print("Evaluation dataset was aligned to development feature set.")
         return val_aligned
     
-
+    # Evaluation function that returns the evaluation metrics rmse, mae and r2, along with supportive boxplots to visualize the results
     def evaluate_model(self, model, X, y, runs=30, test_size=0.2, scale=True, save_path=None):
         metrics = {
             'rmse': [],
