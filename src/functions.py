@@ -80,7 +80,10 @@ class Regressor:
         df.to_csv(output_path, index=False)
         print(f"The preprocessed data was saved to {output_path}.")
         return df
-    
+
+    # this function is designed to take as input the reduced df 
+    # it drops columns that are not considered important features and 
+    # splits the data into features and target 
     def separate_features_target(self, df, target, columns_to_remove=None):
         if columns_to_remove is None:
             columns_to_remove=[]
@@ -89,13 +92,18 @@ class Regressor:
         y=df[target]
         return X, y
     
-
+    # Feature Selection Function 
+    # this function computes the linear correlation of each feature with the target 
+    # based on the Pearsons Correlation Coefficient 
     def select_features(self, X, y, threshold=0.1):
         correlations = pd.Series(r_regression(X, y), index=X.columns)
         selected_features = correlations[correlations.abs() >= threshold].index.tolist()
         print(f"The selected features of {X.shape[1]} were: {len(selected_features)}")
         return selected_features, correlations
 
+    # Function to train the model
+    # Scale ise set to True 
+    # Scaling is applied after the datasets are split into training and test sets in order to avoid leaking the data
     def train_models(self, X, y, scale=True):
         results = {}
 
@@ -103,18 +111,19 @@ class Regressor:
         X, y, test_size=0.3, random_state=42)
 
         if scale:
+            for name, model in self.models.items():
             scaler=StandardScaler()
             x_train=scaler.fit_transform(x_train)
-            x_test=scaler.fit_transform(x_test)
-                    
-        for name, model in self.models.items():
             model.fit(x_train, y_train)
+            x_test=scaler.fit_transform(x_test)
             y_pred = model.predict(x_test)
             rmse = root_mean_squared_error(y_test, y_pred)
             results[name] = rmse
             print(f"{name} RMSE: {rmse:.4f}")
+                    
         return results
 
+    # Function to train the tuned models, with the hyperaparameters 
     def train_tuned_model(self, model, X, y, scale=True):
         x_train, x_test, y_train, y_test = train_test_split(
         X, y, test_size=0.3, random_state=42)
@@ -143,7 +152,8 @@ class Regressor:
         for model, params in param_grid.items()
         }
         return model_combinations
-
+        
+    # Model tuning through grid search using five fold cross validation 
     def model_tuning(self, param_grid, X, y, cv=5):
         best_results = {}
         for model, param_grid in param_grid.items():
