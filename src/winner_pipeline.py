@@ -81,12 +81,15 @@ class BMI_predictor:
     # function that separates features and target,
     # 
     def train_model(self, df, target='BMI', columns_to_drop=None, scale=True):
+        self.selected_features = selected_features
         if columns_to_drop is None:                                                                # creates empty list for columns to drop if not provided with one
             columns_to_drop=[]
     
-        if selected_features is not None: 
-            selected_features = [col for col in selected_features if col in df.columns]
-            selected_df = df[selected_features + [target]]                                         # creates df that contains only the selected features 
+        if self.selected_features is not None:
+            selected_df = df[[col for col in self.selected_features if col in df.columns] + [target]]
+        else:
+            selected_df = df.copy()
+                                                                                                   # creates df that contains only the selected features 
                                                                                                    # and the target
 
         X = df.drop(columns=[target])                                                              # X=> only the features (29 columns)
@@ -96,9 +99,9 @@ class BMI_predictor:
         X, y, test_size=0.3, random_state=42)                                                      # splits X and y into training and test sets 
 
     
-        self.prepare_pipeline(X_train)                                                             # preprocessing X_train, includes scaling  
+        self.preprocess_pipeline(X_train)                                                             # preprocessing X_train, includes scaling  
         self.pipeline.fit(X_train, y_train)                                                        # before training the model in order to avoid data leakage
-        self.prepare_pipeline(X_test)                                                              # then preprocessing X_test
+        self.preprocess_pipeline(X_test)                                                              # then preprocessing X_test
         y_pred = self.pipeline.predict(X_test)
 
         rmse = root_mean_squared_error(y_test, y_pred)
@@ -132,9 +135,9 @@ class BMI_predictor:
         X_train, X_test, y_train, y_test = train_test_split(
             X, y, test_size=0.2, random_state=42)                                               # splits X and y into tarining and test sets
 
-        self.prepare_pipeline(X_train)                                                          # preprocessing and scaling X_train
+        self.preprocess_pipeline(X_train)                                                          # preprocessing and scaling X_train
         self.pipeline.fit(X_train, y_train)                                                     # applying breg model
-        self.prepare_pipeline(X_test)                                                           # preprocessing and scaling X_test
+        self.preprocess_pipeline(X_test)                                                           # preprocessing and scaling X_test
         y_pred = self.pipeline.predict(X_test)                                                  # making predictions 
 
         rmse = root_mean_squared_error(y_test, y_pred)                                          # computing the evaluation metrics

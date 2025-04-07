@@ -237,7 +237,7 @@ class Regressor:
 
         return results
     
-class BMI_predictor:
+class BMI_predict:
     def __init__(self):
         self.model=BayesianRidge(lambda_1=1e-05)
         self.metadata_columns_to_drop=['Unnamed: 0', 'Project ID', 'Experiment type', 'Disease MESH ID']
