@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import joblib
+import sys
 import os
 import itertools
 import seaborn as sns
@@ -16,7 +17,7 @@ from sklearn.feature_selection import r_regression
 from sklearn.decomposition import PCA
 from sklearn.linear_model import ElasticNet, BayesianRidge
 from sklearn.svm import SVR
-from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score, root_mean_squared_error
+from sklearn.metrics import mean_absolute_error, r2_score, root_mean_squared_error
 from sklearn.model_selection import train_test_split, cross_val_score
 
 class BMI_predictor:
@@ -125,22 +126,33 @@ class BMI_predictor:
             drop_columns = []
         drop_columns = set(drop_columns + [target_column])
         
-        X = df.drop(columns=[target_column])
+        X = df.drop(columns=[target_column])                                                    # separates features and target 
         y = df[target_column]
 
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, y, test_size=0.2, random_state=42)                                               # splits X and y into tarining and test sets
 
-        self.prepare_pipeline(X_train)
-        self.pipeline.fit(X_train, y_train)
-        self.prepare_pipeline(X_test)
-        y_pred = self.pipeline.predict(X_test)
+        self.prepare_pipeline(X_train)                                                          # preprocessing and scaling X_train
+        self.pipeline.fit(X_train, y_train)                                                     # applying breg model
+        self.prepare_pipeline(X_test)                                                           # preprocessing and scaling X_test
+        y_pred = self.pipeline.predict(X_test)                                                  # making predictions 
 
-        rmse = root_mean_squared_error(y_test, y_pred)
+        rmse = root_mean_squared_error(y_test, y_pred)                                          # computing the evaluation metrics
         mae = mean_absolute_error(y_test, y_pred)
         r2 = r2_score(y_test, y_pred)
 
         print(f"Evaluation Metrics:\nRMSE: {rmse:.4f}\nMAE: {mae:.4f}\nR2: {r2:.4f}")
+
+        for metric, values in metrics.items():                                                   # creates boxplots for each of the metric scores
+            plt.figure(figsize=(8, 6))
+            sns.boxplot(y=values)
+            plt.title(f"{metric.upper()} Distribution")
+            plt.ylabel(metric.upper())
+            plt.show()
+
         return {"RMSE": rmse, "MAE": mae, "R2": r2}
+    
+        
 
     def save_model(self, save_path='final_models/winner.pkl'):
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
