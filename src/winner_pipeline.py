@@ -24,8 +24,8 @@ class BMI_predictor:
     def __init__(self):
         self.model=BayesianRidge(lambda_1=1e-05)
         self.metadata_columns_to_drop=['Unnamed: 0', 'Project ID', 'Experiment type', 'Disease MESH ID']
-        self.pipeline=None
         self.target='BMI'
+        self.pipeline = None
         self.selected_features=['Alistipes putredinis', 'Anaerotruncus colihominis', 'Bacillus megaterium', 
                                 'Bacteroides massiliensis', 'Bifidobacterium saguini', 'Christensenella minuta',
                                 'Clostridium amylolyticum', 'Desulfonispora thiosulfatigenes', 'Desulfovibrio desulfuricans', 
@@ -50,30 +50,29 @@ class BMI_predictor:
 
     # function that preprocesses the data    
     def preprocess_pipeline(self, df, scale=False):
-        df = df.drop(columns=[col for col in self.metadata_columns_to_drop if col in df.columns])  # Drops the metadata columns that were user defined
+        df = df.drop(columns=[col for col in self.metadata_columns if col in df.columns], errors='ignore')  # Drops the metadata columns that were user defined
         
         if hasattr(self, 'selected_features') and self.selected_features is not None:
-            df = df[[col for col in df.columns if col in self.selected_features]]                  # Drops everything but the selected features
+            df = df[[col for col in df.columns if col in self.selected_features]]                # Drops everything but the selected features
 
         num_feats = df.select_dtypes(include=[np.number]).columns.tolist()                         # df containing the columns with numerical features
         cat_feats = df.select_dtypes(exclude=[np.number]).columns.tolist()                         # df containing the columns with categorical features 
         
-        if scale:                                                                                  # Applys scaling whenever is necessary 
-            num_pipeline = Pipeline([
-                ('imputer', SimpleImputer(strategy='mean')),
-                ('scaler', StandardScaler())
-            ])
-        else:
-            num_pipeline = Pipeline([('imputer', SimpleImputer(strategy='mean'))])                 # pipeline for handling missing values 
-        cat_pipeline = Pipeline([('encoder', OneHotEncoder(handle_unknown='ignore'))])             # pipeline for encoding categorical values
+        numeric_pipeline = Pipeline([
+            ('imputer', SimpleImputer(strategy='mean'))
+        ])
 
-        preprocess = ColumnTransformer([                                                           # applies pipeline to the features 
-            ('num', num_pipeline, num_feats),
-            ('cat', cat_pipeline, cat_feats)
+        categorical_pipeline = Pipeline([
+            ('encoder', OneHotEncoder(handle_unknown='ignore'))
+        ])
+
+        preprocessor = ColumnTransformer([
+            ('num', numeric_pipeline, num_feats),
+            ('cat', categorical_pipeline, cat_feats)
         ])
 
         self.pipeline = Pipeline([
-            ('preprocessing', preprocess),
+            ('preprocessing', preprocessor),
             ('model', self.model)
         ])
         return df                                                                                  # returns reduced df (700x137)
@@ -81,26 +80,22 @@ class BMI_predictor:
     # function that separates features and target,
     # 
     def train_model(self, df, target='BMI', columns_to_drop=None, scale=True, selected_features=[]):
-        if columns_to_drop is None:                                                                # creates empty list for columns to drop if not provided with one
-            columns_to_drop=[]
-    
+        self.selected_features = selected_features
+        if drop_columns is None:
+            drop_columns = []
+
+        self.metadata_columns = drop_columns.copy()
+
         if self.selected_features is not None:
             selected_df = df[[col for col in self.selected_features if col in df.columns] + [target]]
-        else:
-            selected_df = df.copy()
-                                                                                                   # creates df that contains only the selected features 
-                                                                                                   # and the target
 
-        X = selected_df.drop(columns=[target])                                                              # X=> only the features (29 columns)
-        y = selected_df[target]                                                                             # y=> only the target   (1 column)
+        X = selected_df.drop(columns=[target])
+        y = selected_df[target]
 
-        X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.3, random_state=42)                                                      # splits X and y into training and test sets 
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
 
-    
-        self.preprocess_pipeline(X_train)                                                             # preprocessing X_train, includes scaling  
-        self.pipeline.fit(X_train, y_train)                                                        # before training the model in order to avoid data leakage
-        self.preprocess_pipeline(X_test)                                                              # then preprocessing X_test
+        self.preprocess_pipeline(df, scale=scale)
+        self.pipeline.fit(X_train, y_train)
         y_pred = self.pipeline.predict(X_test)
 
         rmse = root_mean_squared_error(y_test, y_pred)
@@ -123,9 +118,10 @@ class BMI_predictor:
             'mae': [],
             'r2': []
         }
-
+        
         if drop_columns is None:
             drop_columns = []
+        self.metadata_columns = drop_columns.copy()
         drop_columns = set(drop_columns + [target_column])
         
         X = df.drop(columns=[target_column])                                                    # separates features and target 
